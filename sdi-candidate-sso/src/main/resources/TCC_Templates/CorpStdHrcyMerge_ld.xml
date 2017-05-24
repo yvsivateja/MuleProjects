@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<load:load productCode="SO1007" model="http://www.taleo.com/ws/so800/2009/01" root="Organization" operation="merge" locale="en" header="true" delimiter="," quote="&quot;" preparator="olf" attributes="switch.system.maintenance=always,non.updatable.fields=error.different" xmlns:load="http://www.taleo.com/ws/integration/load">
+    <load:columns>
+        <load:column type="IDENTIFIER" header="Identifier" path=""/>
+        <load:column parameter="1" type="DATA" path="Name" ignoreEmpty="true" localeType="SPECIFIC" localeValue="en"/>
+        <load:column parameter="1" type="DATA" path="Name" ignoreEmpty="true" localeType="SPECIFIC" localeValue="fr"/>
+        <load:column parameter="1" type="DATA" path="Name" ignoreEmpty="true" localeType="SPECIFIC" localeValue="zh-TW"/>
+        <load:column parameter="1" type="DATA" path="Name" ignoreEmpty="true" localeType="SPECIFIC" localeValue="ja"/>
+        <load:column parameter="1" type="DATA" path="Code" searchType="SEARCH_AND_VALUE" searchTarget="." ignoreEmpty="true" localeType="NONE"/>
+        <load:column parameter="1" type="DATA" path="Parent,Code" searchType="SEARCH" searchTarget="." ignoreEmpty="true" localeType="NONE"/>
+        <load:column parameter="1" type="DATA" path="Status,Description" searchType="SEARCH" searchTarget="." ignoreEmpty="true" localeType="DEFAULT"/>
+        <load:column parameter="1" type="DATA" path="Industry,Number" searchType="SEARCH" searchTarget="." ignoreEmpty="true" localeType="NONE"/>
+    </load:columns>
+    <load:processingInstructions/>
+</load:load>

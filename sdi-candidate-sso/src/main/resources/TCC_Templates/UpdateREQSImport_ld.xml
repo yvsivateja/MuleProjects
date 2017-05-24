@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<load:load productCode="PRO1007" model="http://www.taleo.com/ws/tee800/2009/01" root="Requisition" operation="update" locale="en" header="true" delimiter="," quote="&quot;" attributes="non.updatable.fields=error.different" xmlns:load="http://www.taleo.com/ws/integration/load">
+    <load:columns>
+        <load:column type="IDENTIFIER" header="Identifier" path=""/>
+        <load:column parameter="1" type="DATA" path="ContestNumber" searchType="SEARCH" searchTarget="." localeType="NONE"/>
+        <load:column parameter="1" type="DATA" header="CostCenter" path="Department,Code" searchType="SEARCH" searchTarget="." localeType="NONE"/>
+        <load:column parameter="1" type="DATA" header="OrganizationCode" path="JobInformation,Organization,Code" searchType="SEARCH" searchTarget="." localeType="NONE"/>
+    </load:columns>
+    <load:processingInstructions/>
+</load:load>

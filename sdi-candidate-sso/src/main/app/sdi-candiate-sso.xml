@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:data-mapper="http://www.mulesoft.org/schema/mule/ee/data-mapper" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schema/mule/ee/data-mapper/current/mule-data-mapper.xsd">
+	<!-- <spring:beans>
+		<spring:bean id="appProps" class="org.springframework.beans.factory.config.PropertiesFactoryBean">
+			<spring:property name="singleton" value="true" />
+			<spring:property name="location" value="classpath:JCTaleoUpdater.properties" />
+		</spring:bean>
+		<spring:bean id="dataSource" class="org.enhydra.jdbc.standard.StandardDataSource" destroy-method="shutdown" name="DataSource-Bean">
+			<spring:property name="driverName" value="oracle.jdbc.driver.OracleDriver" />
+		</spring:bean>
+		<spring:bean id="Zip-CC" name="Zip-CC" class="com.jpmc.hrt.sdi.zip.ArchiveFile">
+		</spring:bean>
+		<spring:bean id="changeDB" class="com.jpmc.hrt.sdi.epvaim.ChangeDatabase" name="Bean" />
+		<spring:bean id="ePVAIMCredentialRequester" name="EPVAIMCredentialRequester" class="com.jpmc.hrt.sdi.epvaim.EPVAIMCredentialRequester" />
+	</spring:beans>
+	<db:generic-config name="dbConfig" dataSource-ref="dataSource" doc:name="Generic Database Configuration" />
+	<file:connector name="FileGeneration" outputPattern="Test" autoDelete="true" streaming="true" validateConnections="true" doc:name="File" />
+	<http:listener-config name="HTTP_Listener_Configuration" host="localhost" port="8081" doc:name="HTTP Listener Configuration" />
+	<db:oracle-config name="Oracle_Configuration" host="psin3p970-scan.svr.us.jpmchase.net" port="6135" instance="EPI_DEV.CT.whem.jpmchase.net"
+		user="obglobal_admin" password="ora_obglobal123" doc:name="Oracle Configuration" />
+	<data-mapper:config name="List_Map__To_CSV" transformationGraphPath="list_map__to_csv.grf" doc:name="List_Map__To_CSV" />
+	<flow name="csv-importFlow">
+		<http:listener config-ref="HTTP_Listener_Configuration" path="/candidatesso" doc:name="HTTP" />
+		<set-variable variableName="job_name" value="CandSetInternalFlag" doc:name="JobNameVariable" />
+		<flow-ref name="execute-job" doc:name="execute-job" />
+		<flow-ref name="Generate-epv-aim" doc:name="Generate-epv-aim" />
+		<flow-ref name="Generate-epv-aim" doc:name="Generate-epv-aim" />
+		<db:select config-ref="dbConfig" doc:name="Job SQL"> <db:dynamic-query><![CDATA[#[flowVars.sSQL]]]></db:dynamic-query> </db:select>
+
+	</flow>
+	<sub-flow name="execute-job">
+		<flow-ref name="Initialize-and-set-variables-subflow" doc:name="Initialize-and-set-variables-subflow" />
+		<scripting:transformer doc:name="PreValidation Using Groovy Scripting">
+			<scripting:script engine="Groovy"><![CDATA[if("Active".equalsIgnoreCase(flowVars.m_LoadTypeStatus)){
+		log.info("Load type name '" + flowVars.job_name + "' was found and 'Active' in the properties file.  Process is continuing..." );
+		}else{
+		log.error("Load type name specified in the input message (" + flowVars.job_name + ") was either not found or not 'Active' in the properties file.  Process is terminating!");
+		}
+		if ("EPI".equalsIgnoreCase(flowVars.m_SQLDataSource ) || "GDW".equalsIgnoreCase(flowVars.m_SQLDataSource ) || "PeopleSoft".equalsIgnoreCase(flowVars.m_SQLDataSource )) {
+		log.info("A valid Data Source was specified in properties file.  Using '" + flowVars.m_SQLDataSource + "'.  Process is continuing..." );
+		}else{
+		log.error("The Data Source specified in the property file was either not specified or not supported (found: '" + flowVars.m_SQLDataSource + "')  Process is terminating!  Allowed values are: EPI, GDW, or PeopleSoft.");
+		}]]></scripting:script>
+		</scripting:transformer>
+		<logger message="#[flowVars.bTCCBatchRowNeeded]" level="INFO" doc:name="TCCBatchRowNeeded Logger" />
+		<flow-ref name="ControlRowSubFlow" doc:name="ControlRowSubFlow" />
+		<db:select config-ref="Oracle_Configuration" doc:name="Job SQL oracle">
+			<db:dynamic-query><![CDATA[#[flowVars.sSQL]]]></db:dynamic-query>
+		</db:select>
+		<set-variable variableName="dbResultPayload" value="#[payload]" doc:name="DB ResultPayload SQL Variable" />
+
+		<data-mapper:transform doc:name="" />
+		<file:outbound-endpoint path="#[flowVars.OBGAbsolutePath] + #[flowVars.csvFileOutputDirectory]" outputPattern="#[flowVars.job_name].csv"
+			connector-ref="FileGeneration" responseTimeout="10000" doc:name="File" />
+		<scripting:transformer doc:name="TermsCandIDExport Groovy Scripting">
+			<scripting:script engine="Groovy"><![CDATA[
+			def dbResults = message.getInvocationProperty('dbResultPayload');
+			def iTotalPeopleSoftTerms = 0;
+            def iPeopleSoftTermsWithCandID = 0;
+            def iPeopleSoftTermsWithoutCandID = 0;
+			for(param in dbResults){
+				iTotalPeopleSoftTerms++;
+				if(param["CANDIDATEID"] == null){
+					iPeopleSoftTermsWithoutCandID++;
+					if(param["SSOID"] != null){
+						message.setInvocationProperty('sExportFilter', param["SSOID"]);
+					}
+				}else{
+					iPeopleSoftTermsWithCandID++;
+				}
+			}
+			log.info( "Total PeopleSoft Terms=" + iTotalPeopleSoftTerms + " ..... PeopleSoft Terms with CandID=" + iPeopleSoftTermsWithCandID + " ..... PeopleSoft Terms without CandID=" + iPeopleSoftTermsWithoutCandID );
+            log.info( "SSOID Filter list for Candidate ID Export Template file is (" + iPeopleSoftTermsWithoutCandID + "):\n" + sExportFilter );
+            def filePath = message.getInvocationProperty('OBGAbsolutePath')+message.getInvocationProperty('sTemplateForTemplate');
+            def fileContents = new File(filePath).text;
+            fileContents = fileContents.replaceAll("FilterList_Goes_Here",message.getInvocationProperty('sExportFilter'));
+			payload=fileContents;
+		]]></scripting:script>
+		</scripting:transformer>
+		<file:outbound-endpoint path="#[flowVars.OBGAbsolutePath]+#[flowVars.sTemplateForExport]" connector-ref="FileGeneration"
+			responseTimeout="10000" doc:name="TSE Export Engine XML File" />
+		<set-variable variableName="zipByte" value="" doc:name="Zip File(s) Variable" />
+		<component doc:name="Zip-CC">
+			<spring-object bean="Zip-CC" />
+		</component>
+		<set-attachment attachmentName="CostCenter.zip" value="#[flowVars.zipByte]" contentType="application/zip" doc:name="Attachment" />
+		<smtp:outbound-endpoint host="mailhost.jpmchase.net" connector-ref="SMTP" to="${CostCenter.To}" from="${CostCenter.From}"
+			subject="${CostCenter.Summary}" replyTo="Do.NotReply@jpmchase.com" responseTimeout="10000" doc:name="SMTP" />
+		<logger message="eMail is sent!" level="INFO" doc:name="Success email " />
+	</sub-flow>
+	<sub-flow name="Initialize-and-set-variables-subflow">
+		<set-variable variableName="OBGAbsolutePath" value="#[app.registry.appProps['OBGAbsolutePath']]" doc:name="loadTypeStatusVariable" />
+		<set-variable variableName="m_LoadTypeStatus" value="#[app.registry.appProps[flowVars.job_name]]" doc:name="loadTypeStatusVariable" />
+		<set-variable variableName="m_SQLDataSource" value="#[app.registry.appProps[flowVars.job_name+'_SQLDataSource']]" doc:name="SQLDataSourceVariable" />
+		<set-variable variableName="bTCCBatchRowNeeded" value="#[app.registry.appProps[flowVars.job_name+'_TCCBatchRowNeeded']]" doc:name="TCCBatchRowNeeded Variable" />
+		<set-variable variableName="sSQL" value="#[app.registry.appProps[flowVars.job_name+'_SQL']]" doc:name="SQL Variable" />
+		<set-variable variableName="csvFileOutputDirectory" value="#[app.registry.appProps[flowVars.job_name+'_CSVOutputDir']]" doc:name="CSV File Output Directory Variable" />
+		<set-variable variableName="controlFlowSQL" value="" doc:name="Control Flow SQL Variable" />
+		<set-variable variableName="sTemplateForTemplate" value="#[app.registry.appProps[flowVars.job_name+'_TemplateForTemplate']]" doc:name="Template Variable" />
+		<set-variable variableName="sTemplateForExport" value="#[app.registry.appProps[flowVars.job_name+'_TemplateForExport']]" doc:name="Export Template Variable" />
+		<set-variable variableName="sExportFilter" value="" doc:name="sExportFilter Variable" />
+	</sub-flow>
+	<sub-flow name="ControlRowSubFlow">
+		<choice doc:name="Control Row Choice Block">
+			<when expression="#[flowVars.bTCCBatchRowNeeded]">
+				<logger message="#[flowVars.sSQL]" level="INFO" doc:name="SQL Logger" />
+				<db:select config-ref="dbConfig" doc:name="GetTCCBatchDatabase"> <db:parameterized-query><![CDATA[SELECT * FROM TCC_BATCH WHERE COMPONENT_NAME=(:COMPONENT_NAME)]]></db:parameterized-query> 
+					</db:select>
+				<db:select config-ref="Oracle_Configuration" doc:name="GetTCCBatchDatabase oracle">
+					<db:dynamic-query><![CDATA[SELECT * FROM TCC_BATCH WHERE COMPONENT_NAME='#[flowVars.job_name]']]></db:dynamic-query>
+				</db:select>
+
+				<logger message="Results : #[payload]" level="INFO" doc:name="Logger" />
+
+				<choice doc:name="Control Row exists Choice Block">
+					<when expression="payload.size() &gt; 0">
+						<scripting:transformer doc:name="Change SQL Using Groovy Scripting">
+							<scripting:script engine="Groovy"><![CDATA[java.text.SimpleDateFormat oracleDateFormatter = new java.text.SimpleDateFormat( "dd-MMM-yy" );
+							java.text.SimpleDateFormat startTimeDateFormatter = new java.text.SimpleDateFormat( "yyyy-MM-dd HH:mm:ss.SSS" );
+java.text.SimpleDateFormat oracleDateTimeFormatter = new java.text.SimpleDateFormat( "dd-MMM-yyyy HH:mm:ss" );
+String jobSQL = message.getInvocationProperty("sSQL");
+java.sql.Timestamp m_CRD = new java.sql.Timestamp( System.currentTimeMillis() );
+String m_CRD_DateOnly = oracleDateFormatter.format( m_CRD );
+String m_LRD = payload.get(0)["START_TIME"];
+java.util.Calendar calendar = java.util.Calendar.getInstance();
+calendar.setTime( startTimeDateFormatter.parse(m_LRD) );
+String m_LRD_DateTime = oracleDateTimeFormatter.format( new java.sql.Timestamp( calendar.getTime().getTime() ) );
+log.info("m_LRD: "+m_LRD);
+log.info("JOB SQL:"+jobSQL);
+jobSQL = jobSQL.replaceAll( "LRD_Goes_Here", m_LRD );
+jobSQL = jobSQL.replaceAll( "LRDT_Goes_Here",  m_LRD_DateTime);
+jobSQL = jobSQL.replaceAll( "CRD_Goes_Here",m_CRD_DateOnly);
+String controlFlowSQLQuery = "UPDATE TCC_BATCH SET END_TIME=to_date('" + m_CRD_DateOnly + "','dd-mon-yy'),BATCH_STATUS='Running' WHERE COMPONENT_NAME='" + message.getInvocationProperty('job_name') + "'";
+message.setInvocationProperty('controlFlowSQL',controlFlowSQLQuery);
+message.setInvocationProperty('sSQL',jobSQL);
+log.info("controlFlowSQLQuery: "+controlFlowSQLQuery);
+log.info("jobSQL Changed To :: "+jobSQL);
+]]></scripting:script>
+						</scripting:transformer>
+						<db:update config-ref="dbConfig" doc:name="GetTCCBatchDatabase"> <db:dynamic-query><![CDATA[UPDATE TCC_BATCH SET END_TIME=#[function:now],BATCH_STATUS='Running' 
+							WHERE COMPONENT_NAME=#[flowVars.job_name]]]></db:dynamic-query> </db:update>
+
+						<db:update config-ref="Oracle_Configuration" doc:name="GetTCCBatchDatabase oracle">
+							<db:dynamic-query><![CDATA[#[flowVars.controlFlowSQL]]]></db:dynamic-query>
+							UPDATE TCC_BATCH SET END_TIME=#[function:now],BATCH_STATUS='Running' WHERE COMPONENT_NAME='#[flowVars.job_name]'
+						</db:update>
+						<logger message="Done with Update : #[payload]" level="INFO" doc:name="Logger" />
+					</when>
+					<otherwise>
+						<db:insert config-ref="dbConfig" doc:name="Database"> <db:parameterized-query><![CDATA[INSERT INTO TCC_BATCH(COMPONENT_NAME,START_TIME,END_TIME,BATCH_STATUS,TIME_OFFSET,STOP_BATCH) 
+							VALUES (#[flowVars.job_name],#[function:now],null,"DefaultRow","XXX","X")]]></db:parameterized-query> </db:insert>
+						<db:insert config-ref="Oracle_Configuration" doc:name="Database oracle">
+							<db:parameterized-query><![CDATA[INSERT INTO TCC_BATCH(COMPONENT_NAME,START_TIME,END_TIME,BATCH_STATUS,TIME_OFFSET,STOP_BATCH) 
+VALUES (#[flowVars.job_name],#[function:now],null,"DefaultRow","XXX","X")]]></db:parameterized-query>
+						</db:insert>
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise>
+				<logger message="#[flowVars.bTCCBatchRowNeeded]" level="INFO" doc:name="Logger" />
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<sub-flow name="Generate-epv-aim">' <set-variable variableName="dbHost" value="${db.host}" doc:name="Variable" /> <set-variable variableName="dbPort" 
+		value="${db.port}" doc:name="Variable" /> <invoke name="CSH-EPI-Invoke" object-ref="ePVAIMCredentialRequester" method="getEPVCredentialByContext" methodArguments="epv-aim://epv-aim.dbAcctSDI" 
+		/> <set-variable variableName="dbInstance" value="${db.instance}" doc:name="Variable" /> <enricher doc:name="Message Enricher"> <enrich source="#[message.payload.epvUserName]" 
+		target="#[sessionVars.epvUserName]" /> <enrich source="#[message.payload.epvPassword]" target="#[sessionVars.epvPassword]" /> </enricher> <logger message="DB 
+		Insert Log: Username: #[sessionVars.epvUserName] and Password : #[sessionVars.epvPassword]" level="DEBUG" doc:name="Logger" /> <component doc:name="Get 
+		DB Config URL _Java"> <spring-object bean="changeDB" /> </component> </sub-flow>
+ --></mule>

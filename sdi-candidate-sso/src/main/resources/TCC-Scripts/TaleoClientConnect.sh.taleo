@@ -1,0 +1,32 @@
+#!/bin/sh
+
+# Make sure that the JAVA_HOME variable is defined
+if  [ ! "${JAVA_HOME}" ]
+then
+    echo +-----------------------------------------+
+    echo "+ The JAVA_HOME variable is not defined.  +"
+    echo +-----------------------------------------+
+    exit 1
+fi
+
+# Make sure the IC_HOME variable is defined
+if  [ ! "${IC_HOME}" ]
+then
+    IC_HOME=.
+fi
+
+# Check if the IC_HOME points to a valid taleo Connect Client folder
+if [ -e "${IC_HOME}/lib/taleo-integrationclient.jar" ]
+then
+    # Define the class path for the client execution
+    IC_CLASSPATH="${IC_HOME}/lib/taleo-integrationclient.jar":"${IC_HOME}/log"
+
+    # Execute the client
+    ${JAVA_HOME}/bin/java ${JAVA_OPTS} -Xmx256m ${TCC_PARAMETERS} -Dcom.taleo.integration.client.install.dir="${IC_HOME}" -Djava.endorsed.dirs="${IC_HOME}/lib/endorsed" -Djavax.xml.parsers.SAXParserFactory=org.apache.xerces.jaxp.SAXParserFactoryImpl -Djavax.xml.transform.TransformerFactory=net.sf.saxon.TransformerFactoryImpl -Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.Log4JLogger -Djavax.xml.xpath.XPathFactory:http://java.sun.com/jaxp/xpath/dom=net.sf.saxon.xpath.XPathFactoryImpl -classpath ${IC_CLASSPATH} com.taleo.integration.client.Client ${@}
+else
+    echo +-----------------------------------------------------------------------------------------------
+    echo "+ The IC_HOME variable is defined as (${IC_HOME}) but does not contain the Taleo Connect Client"
+    echo "+ The library ${IC_HOME}/lib/taleo-integrationclient.jar cannot be found.                      "
+    echo +-----------------------------------------------------------------------------------------------
+    exit 2
+fi

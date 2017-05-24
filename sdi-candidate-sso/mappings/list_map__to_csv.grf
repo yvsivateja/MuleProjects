@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><Graph __version="3.5.0" author="d573662" created="Thu May 18 10:30:55 EDT 2017" description="List&lt;Map&gt; To CSV" guiVersion="3.4.4.P" id="1495143925061" licenseCode="Unlicensed" licenseType="Unknown" modified="Thu May 18 10:30:55 EDT 2017" modifiedBy="d573662" name="List_Map__To_CSV" revision="1.0" showComponentDetails="false">
+<Global>
+<Metadata __referenceCounter="1" _dataStructure="SINGLE_DIMENSIONAL_COLLECTION" _type="Output" id="777e8a36-78ee-4f57-be8c-f500d15d3fdb">
+<Record fieldDelimiter="," name="CandSSOIDUpdate06152016T073604" recordDelimiter="\n\\|\r\n\\|\r" type="delimited">
+<Field containerType="SINGLE" label="IDENTIFIER" name="IDENTIFIER" size="10" type="string"/>
+<Field containerType="SINGLE" label="CANDIDATEID" name="CANDIDATEID" size="10" type="string"/>
+<Field containerType="SINGLE" label="SSOID" name="SSOID" size="10" type="string"/>
+<Field containerType="SINGLE" eofAsDelimiter="true" label="PackageID" name="PackageID" size="10" type="string"/>
+<Field __artificialType="_id" name="__id" type="long"/>
+</Record>
+</Metadata>
+<Metadata __index="0" __referenceCounter="1" __sourcePath="{}/Map" _dataStructure="SINGLE_DIMENSIONAL_COLLECTION" _id="__id" _type="Input" id="d639c1d5-6059-4844-bc35-dd0b531569a6">
+<Record fieldDelimiter="," name="Map" recordDelimiter="\n\\|\r\n\\|\r" type="delimited">
+<Field __artificialType="_id" __systemManaged="true" name="__id" type="string"/>
+</Record>
+</Metadata>
+<Dictionary>
+<Entry id="DictionaryEntry0" input="true" name="inputPayload" output="false" type="object"/>
+<Entry id="DictionaryEntry1" input="false" name="outputPayload" output="true" type="object"/>
+</Dictionary>
+</Global>
+<Phase number="0">
+<Node enabled="enabled" fileURL="dict:inputPayload" guiName="Map&lt;k,v&gt; READER" guiX="20" guiY="20" id="BEAN_READER0" type="BEAN_READER">
+<attr name="mapping"><![CDATA[<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<Context outPort="0" sequenceField="__id" xpath="."/>
+]]></attr>
+<attr name="_data_format"><![CDATA[MAP]]></attr>
+<attr name="__metadata"><![CDATA[true]]></attr>
+</Node>
+<Node charset="UTF-8" enabled="enabled" excludeFields="__id" fileURL="dict:outputPayload" guiName="CSV WRITER" guiX="900" guiY="20" id="DATA_WRITER0" quotedStrings="true" type="DATA_WRITER">
+<attr name="_data_format"><![CDATA[CSV]]></attr>
+<attr name="__dataSourceDefinition"><![CDATA[C:/FAST/Candidate/CandSSOIDUpdate_06152016/CandSSOIDUpdate06152016T073604.csv]]></attr>
+</Node>
+<Node enabled="enabled" guiName="Foreach 'Map' -&gt; 'CandSSOIDUpdate06152016T073604'" guiX="460" guiY="20" id="FOREACH_MAP_CAND_SSOIDUPDATE06152016T073604" transformClass="com.mulesoft.datamapper.transform.MelRecordTransform" type="REFORMAT">
+<attr name="melScript"><![CDATA[//MEL
+//START -> DO NOT REMOVE
+output.__id = str2long(input.__id);
+//END -> DO NOT REMOVE
+]]></attr>
+</Node>
+<Edge debugMode="true" fromNode="BEAN_READER0:0" guiBendpoints="" id="Edge0" inPort="Port 0 (in)" metadata="d639c1d5-6059-4844-bc35-dd0b531569a6" outPort="Port 0 (out)" toNode="FOREACH_MAP_CAND_SSOIDUPDATE06152016T073604:0"/>
+<Edge debugMode="true" fromNode="FOREACH_MAP_CAND_SSOIDUPDATE06152016T073604:0" guiBendpoints="" id="Edge1" inPort="Port 0 (in)" metadata="777e8a36-78ee-4f57-be8c-f500d15d3fdb" outPort="Port 0 (out)" toNode="DATA_WRITER0:0"/>
+</Phase>
+</Graph>
