@@ -23,7 +23,8 @@ http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schem
 		<spring:bean id="Zip-CC" name="Zip-CC" class="com.jpmc.hrt.sdi.zip.ArchiveFile">
 		</spring:bean>
 		<spring:bean id="changeDB" class="com.jpmc.hrt.sdi.epvaim.ChangeDatabase" name="Bean" />
-		<spring:bean id="TCCImportJobReq" name="TCCImportJobReq" class="com.jpmc.hrt.sdi.tcc.services.TCCImportJobReq" />
+		<spring:bean id="TCCImportJobReq" name="TCCImportJobReq" class="com.jpmc.hrt.sdi.tcc.services.TCCImportJobCP" />
+		<spring:bean id="TCCExportJobReq" name="TCCExportJobReq" class="com.jpmc.hrt.sdi.tcc.services.TCCExportJobCP" />
 		<!-- <spring:bean id="ePVAIMCredentialRequester" name="EPVAIMCredentialRequester" class="com.jpmc.hrt.sdi.epvaim.EPVAIMCredentialRequester" /> -->
 	</spring:beans>
 	<db:generic-config name="dbConfig" dataSource-ref="dataSource" doc:name="Generic Database Configuration" />
@@ -68,8 +69,38 @@ http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schem
 		<logger message="Generic CSV Import - File Saved to #[flowVars.OBGAbsolutePath] + #[flowVars.csvFileOutputDirectory]+#[flowVars.job_name].csv"
 			level="INFO" doc:name="File Status Logger" />
 		<logger message="Now it's time to send the job to the TCC for processing" level="INFO" doc:name="TCC Job Logger" />
-		<invoke name="TCCImport-REQ" object-ref="TCCImportJobReq" method="process" doc:name="TCCImport-REQ" />
+        <component class="com.jpmc.hrt.sdi.tcc.services.TCCImportJobCP" doc:name="TCCImportJobCP"/>
 		<logger message="Response from TCC JOB #[payload]" level="INFO" doc:name="TCC POST Job Logger" />
+		<scripting:transformer doc:name="TermsCandIDExport Groovy Scripting">
+			<scripting:script engine="Groovy"><![CDATA[
+			def dbResults = message.getInvocationProperty('dbResultPayload');
+			def iTotalPeopleSoftTerms = 0;
+            def iPeopleSoftTermsWithCandID = 0;
+            def iPeopleSoftTermsWithoutCandID = 0;
+			for(param in dbResults){
+				iTotalPeopleSoftTerms++;
+				if(param["CANDIDATEID"] == null){
+					iPeopleSoftTermsWithoutCandID++;
+					if(param["SSOID"] != null){
+						message.setInvocationProperty('sExportFilter', param["SSOID"]);
+					}
+				}else{
+					iPeopleSoftTermsWithCandID++;
+				}
+			}
+			log.info( "Total PeopleSoft Terms=" + iTotalPeopleSoftTerms + " ..... PeopleSoft Terms with CandID=" + iPeopleSoftTermsWithCandID + " ..... PeopleSoft Terms without CandID=" + iPeopleSoftTermsWithoutCandID );
+            log.info( "SSOID Filter list for Candidate ID Export Template file is (" + iPeopleSoftTermsWithoutCandID + "):\n" + sExportFilter );
+            def filePath = message.getInvocationProperty('OBGAbsolutePath')+message.getInvocationProperty('sTemplateForTemplate');
+            def fileContents = new File(filePath).text;
+            fileContents = fileContents.replaceAll("FilterList_Goes_Here",message.getInvocationProperty('sExportFilter'));
+			payload=fileContents;
+		]]></scripting:script>
+		</scripting:transformer>
+		<logger message="TSE Export Payload #[payload]" level="INFO" doc:name="TSE Export Logger" />
+		<file:outbound-endpoint path="#[flowVars.OBGAbsolutePath]+#[flowVars.sTemplateForExport]" connector-ref="FileGeneration"
+			responseTimeout="10000" doc:name="TSE Export Engine XML File" />
+        <component class="com.jpmc.hrt.sdi.tcc.services.TCCExportJobCP" doc:name="TCCExportJobCP"/>
+        <logger message="Response from TCC Export JOB #[payload]" level="INFO" doc:name="TCC Export POST Job Logger" />
 	</sub-flow>
 	<sub-flow name="Initialize-and-set-variables-subflow">
 		<set-variable variableName="OBGAbsolutePath" value="#[app.registry.appProps['OBGAbsolutePath']]" doc:name="Absolute Path" />
@@ -79,6 +110,9 @@ http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schem
 		<set-variable variableName="sSQL" value="#[app.registry.appProps[flowVars.job_name+'_SQL']]" doc:name="SQL Variable" />
 		<set-variable variableName="csvFileOutputDirectory" value="#[app.registry.appProps[flowVars.job_name+'_CSVOutputDir']]" doc:name="CSV File Output Directory Variable" />
 		<set-variable variableName="controlFlowSQL" value="" doc:name="Control Flow SQL Variable" />
+		<set-variable variableName="sTemplateForTemplate" value="#[app.registry.appProps[flowVars.job_name+'_TemplateForTemplate']]" doc:name="Template Variable" />
+		<set-variable variableName="sTemplateForExport" value="#[app.registry.appProps[flowVars.job_name+'_TemplateForExport']]" doc:name="Export Template Variable" />
+		<set-variable variableName="sExportFilter" value="" doc:name="sExportFilter Variable" />
 	</sub-flow>
 	<sub-flow name="ControlRowSubFlow">
 		<choice doc:name="Control Row Choice Block">

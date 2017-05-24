@@ -32,18 +32,18 @@ public class TCCImportJobCP implements Callable {
 		String m_TCCSendEmptyResult = "";
 		String m_TCCEmptyResultDefinition = "";
 		String jobName = eventContext.getMessage().getInvocationProperty("job_name");
-		String m_OBGAbsolutePath = eventContext.getMessage().getInvocationProperty("OBGAbsolutePath");
 		String m_FQ_CSVDataFile = eventContext.getMessage().getInvocationProperty("csvFileOutputDirectory");
 		String resultFile = m_FQ_CSVDataFile + "\\" + jobName + ".xml";
 		String requestFile = m_FQ_CSVDataFile + "\\" + jobName + ".csv";
 		try {
-			tccService.processTCCService(jobName, m_TCCUnixShellMaxMins, m_FQ_TCCScriptName, requestFile,
+			return tccService.processTCCService(jobName, m_TCCUnixShellMaxMins, m_FQ_TCCScriptName, requestFile,
 					m_FQ_ConfigFile, resultFile, m_TCCKillProcessShellScriptFN, m_TCCSendEmptyResult,
 					m_TCCEmptyResultDefinition, m_FQ_CharSet);
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		return eventContext.getMessage().getPayload();
 	}
 
 }
