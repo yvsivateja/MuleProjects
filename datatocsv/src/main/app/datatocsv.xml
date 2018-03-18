@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd">
+	<http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration" />
+	<db:mysql-config name="MySQL_Configuration" host="localhost" port="3306" user="root" password="root" database="test" doc:name="MySQL Configuration" />
+	<file:connector name="File" autoDelete="true" outputAppend="true" streaming="true" validateConnections="true" doc:name="File" />
+	<context:property-placeholder location="datatocsv-${env}.properties"/>
+	<flow name="datatocsvFlow" processingStrategy="synchronous">
+		<poll doc:name="Poll">
+			<schedulers:cron-scheduler expression="${cronexpression}" />
+			<watermark variable="lastRecordID" default-expression="0"  selector-expression="#[payload['id']]" selector="LAST" object-store-ref="_defaultUserObjectStore"/>
+			<db:select config-ref="MySQL_Configuration" doc:name="Database">
+				<db:dynamic-query><![CDATA[SELECT * FROM test_table where id > #[flowVars.lastRecordID]]]></db:dynamic-query>
+			</db:select>
+		</poll>
+        <logger message="#[flowVars.lastRecordID]" level="INFO" doc:name="Logger"/>
+        <set-variable variableName="file_name" value="#['${csvfilename}.csv']" doc:name="Variable"/>
+        <scripting:component doc:name="Groovy Set File Name">
+            <scripting:script engine="Groovy"><![CDATA[def noOfRequiredFiles = ${filescount};
+
+if(noOfRequiredFiles % 2 != 0){
+	noOfRequiredFiles = noOfRequiredFiles-1;
+}
+def now = new Date()
+def sdf = new java.text.SimpleDateFormat("yyyy-MM-dd")
+def dateFormat = "yyyy-MM-dd ".concat("${timeformat}");
+def todaysDateWithStartTime = sdf.format(now).concat(" ${starttime}");
+def startDate = Date.parse(dateFormat,todaysDateWithStartTime);
+def duration = groovy.time.TimeCategory.minus(now,startDate);
+def noOfHoursLapsed = duration.hours;
+def currentFileSlot = Math.ceil(noOfHoursLapsed/(24/noOfRequiredFiles));
+
+use( groovy.time.TimeCategory ) {
+  def hoursToAdd = (currentFileSlot * (24/noOfRequiredFiles)) as Integer;
+  newCurrentDate = startDate + hoursToAdd.hours - 1.minutes
+}
+flowVars.file_name = "${csvfilename}" + "_".concat(newCurrentDate.year.toString()).concat(newCurrentDate.month.toString()).concat(newCurrentDate.date.toString()) + "_".concat(newCurrentDate.hours.toString()).concat(newCurrentDate.minutes.toString()).concat(newCurrentDate.seconds.toString())+".csv";
+println flowVars.file_name;
+return payload;]]></scripting:script>
+        </scripting:component>
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/csv separator=",", quoteValues=true, header=true
+---
+payload]]></dw:set-payload>
+		</dw:transform-message>
+		<file:outbound-endpoint path="${filepath}" outputPattern="#[flowVars.file_name]" connector-ref="File" responseTimeout="10000"
+			doc:name="File" />
+		<set-payload value="#['Done']" doc:name="Set Payload" />
+	</flow>
+</mule>
